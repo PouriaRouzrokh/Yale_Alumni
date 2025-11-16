@@ -1,3 +1,3 @@
 # Yale Alumni Assistant
 
-To be completed...
+Further details regarding the project (to be completed...)
