@@ -1,11 +1,14 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "../LearnCS/GoogleADK"
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../LearnCS/GoogleADK"
+    },
+    {
+      "path": "../Recally_Agents"
+    }
+  ],
+  "settings": {}
 }
