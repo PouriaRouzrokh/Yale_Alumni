@@ -3,7 +3,7 @@
 from typing import Optional, List, Any
 from google.genai import types
 
-from utils.cmd_utils import display_system_message
+from app.utils.cmd_utils import display_system_message
 
 
 import logging
@@ -204,6 +204,10 @@ async def call_root_agent_async(
 ) -> tuple[Optional[str], dict]:
     """
     Call the root agent asynchronously with multimodal content.
+    
+    This function handles low-level event processing and text extraction.
+    It does NOT parse JSON or convert responses to structured formats.
+    For structured output parsing, see ADKService.get_agent_response().
 
     Args:
         runner: ADK runner instance
@@ -215,6 +219,9 @@ async def call_root_agent_async(
 
     Returns:
         Tuple of (agent response text if available, accumulated token counts dict)
+        The response text is raw text extracted from event.content.parts[0].text.
+        For agents with output_schema, this will be JSON text that needs to be parsed
+        by the caller (e.g., ADKService.get_agent_response()).
     """
     content = process_user_message(query, images, voice_notes)
     final_response_text = None
