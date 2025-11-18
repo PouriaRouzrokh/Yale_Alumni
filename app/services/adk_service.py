@@ -8,16 +8,16 @@ from app.configs.app import APP_NAME, logger
 from app.configs.database import SQLALCHEMY_DATABASE_URL
 from app.agents.agent_factory import get_root_agent, AgentMode
 from app.utils.agent_utils import call_root_agent_async
-from app.agents.background_finder_agent.subagents.formatter_agent import BackgroundFinderOutputSchema
+from app.agents.alumni_researcher_agent.subagents.formatter_agent import AlumniResearcherOutputSchema
 
 
 class ADKService:
     """Service for managing Google ADK sessions and AI agent interactions."""
 
-    def __init__(self, user_id: str, agent_mode: AgentMode = "background_finder") -> None:
+    def __init__(self, user_id: str, agent_mode: AgentMode = "alumni_researcher") -> None:
         """
         Initialize ADK service with user_id and agent_mode.
-        Creates session and runner once during initialization.
+        Creates runner once during initialization. Sessions are created per query.
         
         Args:
             user_id: User identifier
@@ -34,24 +34,12 @@ class ADKService:
         self.user_id = user_id
         self.agent_mode = agent_mode
         
-        # These will be set by initialize() method
+        # Runner will be set by initialize() method (created once)
         self.runner: Optional[Runner] = None
-        self.session_id: Optional[str] = None
 
     async def initialize(self) -> None:
-        """Create session and runner. Must be called after __init__."""
-        # Create session
-        self.session_id = str(uuid.uuid4())
-        initial_state = {}
-        
-        session = await self.session_service.create_session(
-            app_name=APP_NAME,
-            user_id=self.user_id,
-            session_id=self.session_id,
-            state=initial_state,
-        )
-        
-        # Create runner
+        """Create runner once. Must be called after __init__."""
+        # Create runner (only once, reused for all queries)
         root_agent = get_root_agent(self.agent_mode)
         self.runner = Runner(
             agent=root_agent,
@@ -59,15 +47,16 @@ class ADKService:
             session_service=self.session_service,
         )
         
-        logger.info(f"Initialized ADKService: user_id={self.user_id}, agent_mode={self.agent_mode}, session_id={self.session_id}")
+        logger.info(f"Initialized ADKService: user_id={self.user_id}, agent_mode={self.agent_mode}, runner created")
 
     async def get_agent_response(
         self, 
-        query: str
-    ) -> Tuple[Optional[BackgroundFinderOutputSchema], Optional[Dict[str, Any]]]:
+        query: str,
+        initial_state: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[AlumniResearcherOutputSchema], Optional[Dict[str, Any]]]:
         """
         Get the response from the agent and parse it into structured format.
-        Uses the runner and session created during initialization.
+        Creates a new session for each query, but reuses the runner.
         
         Args:
             query: User's query string
@@ -75,8 +64,22 @@ class ADKService:
         Returns:
             Tuple of (parsed_response, token_counts) or (None, None) on error
         """
-        if self.runner is None or self.session_id is None:
+        if self.runner is None:
             raise ValueError("ADKService not initialized. Call initialize() first.")
+        
+        # Create a new session for this query
+        # Use provided initial_state or empty dict
+        session_id = str(uuid.uuid4())
+        session_state = initial_state if initial_state is not None else {}
+        
+        await self.session_service.create_session(
+            app_name=APP_NAME,
+            user_id=self.user_id,
+            session_id=session_id,
+            state=session_state,
+        )
+        
+        logger.info(f"Created new session for query: session_id={session_id}")
         
         start_time = time.time()
 
@@ -85,7 +88,7 @@ class ADKService:
             response_text, token_counts = await call_root_agent_async(
                 runner=self.runner,
                 user_id=self.user_id,
-                session_id=self.session_id,
+                session_id=session_id,
                 query=query,
             )
             
@@ -116,7 +119,7 @@ class ADKService:
                 parsed_data = json.loads(response_text)
                 
                 # Validate and parse into Pydantic model
-                parsed_response = BackgroundFinderOutputSchema(**parsed_data)
+                parsed_response = AlumniResearcherOutputSchema(**parsed_data)
                 
                 elapsed_time = time.time() - start_time
                 logger.info(f"Root agent completed successfully in {elapsed_time:.2f} seconds")

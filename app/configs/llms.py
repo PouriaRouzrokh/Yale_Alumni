@@ -1,21 +1,14 @@
-# Background finder sub-agents models
+# Alumni Researcher Agent sub-agents models
 
-BF_SEARCH_MODEL = "gemini-2.5-flash"
-BF_SEARCH_MODEL_THINKING_BUDGET = 2048  # Higher budget for content generation + HTML formatting + URL analysis
+# Background Information Agent
+BACKGROUND_INFORMATION_MODEL = "gemini-2.5-flash"
+BACKGROUND_INFORMATION_MODEL_THINKING_BUDGET = 2048  # Higher budget for content generation + HTML formatting + URL analysis
 
-BF_CRITIQUE_MODEL = "gemini-2.5-flash"
-BF_CRITIQUE_MODEL_THINKING_BUDGET = 1024  # Smart bypass capability reduces actual usage
+# Social Media Agent
+SOCIAL_MEDIA_MODEL = "gemini-2.5-flash"
+SOCIAL_MEDIA_MODEL_THINKING_BUDGET = 2048  # Link validation and selection
+SOCIAL_MEDIA_MAX_LINKS = 20  # Maximum number of links to collect per platform
 
-BF_FORMATTER_MODEL = "gemini-2.5-flash"
-BF_FORMATTER_MODEL_THINKING_BUDGET = 1024  # HTML formatting only
-
-# Email finder sub-agents models
-
-EF_SEARCH_MODEL = "gemini-2.5-flash"
-EF_SEARCH_MODEL_THINKING_BUDGET = 2048  # Higher budget for content generation + HTML formatting + URL analysis
-
-EF_CRITIQUE_MODEL = "gemini-2.5-flash"
-EF_CRITIQUE_MODEL_THINKING_BUDGET = 1024  # Smart bypass capability reduces actual usage
-
-EF_FORMATTER_MODEL = "gemini-2.5-flash"
-EF_FORMATTER_MODEL_THINKING_BUDGET = 1024  # HTML formatting only
+# Formatter Agent
+FORMATTER_MODEL = "gemini-2.5-flash"
+FORMATTER_MODEL_THINKING_BUDGET = 1024  # HTML formatting and structured output generation
