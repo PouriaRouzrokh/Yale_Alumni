@@ -1,5 +1,7 @@
+# Import config early to suppress warnings before ADK imports
+from app.configs import app as app_config  # This will apply warnings filters
+
 from app.services import ADKService
-from app.agents.background_finder_agent.subagents.formatter_agent import AccountInfo
 import asyncio
 import dotenv
 import pandas as pd
@@ -12,7 +14,7 @@ async def main():
     dotenv.load_dotenv()
 
     user_id = "Pouria"
-    agent_mode = "background_finder"
+    agent_mode = "alumni_researcher"
 
     # Initialize the ADK service with user_id and agent_mode
     adk_service = ADKService(user_id=user_id, agent_mode=agent_mode)
@@ -25,8 +27,8 @@ async def main():
     csv_path = os.path.join(project_root, "data", "residents_base_info.csv")
     initial_data = pd.read_csv(csv_path) 
 
-    # Truncate to the first 3 rows
-    initial_data = initial_data.head(3)
+    # Truncate to the first 10 rows
+    initial_data = initial_data.head(10)
 
     # update_dict to store the results
     update_data = []        
@@ -35,8 +37,13 @@ async def main():
         try:
             alumni_name = row["First Name"] + " " + row["Last Name"]
             year_of_entry = row["Entry Year"]
+            
+            # Construct query
             query = f"alumni name: {alumni_name}, year of entry: {year_of_entry}"
-            response, token_counts = await adk_service.get_agent_response(query=query)
+            
+            response, token_counts = await adk_service.get_agent_response(
+                query=query,
+            )
             
             if response is None:
                 raise ValueError("Agent returned None response")
@@ -50,33 +57,34 @@ async def main():
                     "thoughts_token_count": 0,
                 }
             
-            # Safely extract account URLs (ensure we have at least 5 accounts)
-            accounts = response.accounts if response.accounts else []
-            # Ensure we have exactly 5 accounts, padding with empty ones if needed
-            while len(accounts) < 5:
-                accounts.append(AccountInfo(account_type="", account_url=""))
-            
-            update_data.append({
+            # Create row data with practice information, social media links, and additional info
+            # Token columns will be added at the end
+            row_data = {
                 "Name": alumni_name,
                 "Year of Entry to Yale": year_of_entry,
-                "X Profile URL": accounts[0].account_url if len(accounts) > 0 else "",
-                "LinkedIn Profile URL": accounts[1].account_url if len(accounts) > 1 else "",
-                "Facebook Profile URL": accounts[2].account_url if len(accounts) > 2 else "",
-                "Doximity Profile URL": accounts[3].account_url if len(accounts) > 3 else "",
-                "Google Scholar Profile URL": accounts[4].account_url if len(accounts) > 4 else "",
-                "Subspecialties": response.subspecialties if response.subspecialties else [],
-                "Current Practice Location (Country, State, City)": response.current_practice_location or "",
-                "Current Practice Name": response.current_practice_name or "",
-                "Current Practice URL": response.current_practice_url or "",
-                "Current Practice Email": response.current_practice_email or "",
-                "In current practice since (Year)": response.in_current_practice_since or "",
+                "Current Practices Names": response.current_practices_names or "",
+                "Current Practices URLs": response.current_practices_urls or "",
+                "Current Practice Narrative": response.current_practice_narrative or "",
                 "Additional Information": response.additional_information or "",
+                "X (Twitter) Link": response.x_twitter_link or "",
+                "LinkedIn Link": response.linkedin_link or "",
+                "Doximity Link": response.doximity_link or "",
+                "Google Scholar Link": response.google_scholar_link or "",
+                "Facebook Link": response.facebook_link or "",
+            }
+            
+            # Add token counts at the end
+            token_data = {
                 "Total tokens used": token_counts.get("total_token_count", 0),
                 "Prompt tokens used": token_counts.get("prompt_token_count", 0),
                 "Candidates tokens used": token_counts.get("candidates_token_count", 0),
                 "Cached content tokens used": token_counts.get("cached_content_token_count", 0),
                 "Thoughts tokens used": token_counts.get("thoughts_token_count", 0),
-            })
+            }
+            
+            # Combine row data with token data (tokens at the end)
+            row_data.update(token_data)
+            update_data.append(row_data)
         except Exception as e:
             print(f"Error getting agent response for {alumni_name} with year of entry {year_of_entry} (index {index}): {e}")
             update_data.append({
@@ -88,6 +96,15 @@ async def main():
 
     # Save the results to a csv file
     results_df = pd.DataFrame(update_data)
+    
+    # Ensure token columns are at the end by reordering columns if needed
+    token_columns = ["Total tokens used", "Prompt tokens used", "Candidates tokens used", 
+                     "Cached content tokens used", "Thoughts tokens used"]
+    other_columns = [col for col in results_df.columns if col not in token_columns]
+    # Reorder: all other columns first, then token columns at the end
+    column_order = other_columns + [col for col in token_columns if col in results_df.columns]
+    results_df = results_df[column_order]
+    
     results_df.to_csv(os.path.join(project_root, "data", "alumni_results.csv"), index=False)
     print(f"Results saved to {os.path.join(project_root, 'data', 'alumni_results.csv')}")
 
