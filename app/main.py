@@ -27,8 +27,52 @@ async def main():
     csv_path = os.path.join(project_root, "data", "residents_base_info.csv")
     initial_data = pd.read_csv(csv_path) 
 
-    # Truncate to the first 10 rows
-    initial_data = initial_data.head(10)
+    # Truncate to the first rows
+    # initial_data = initial_data.head(3)
+
+    # Get the output CSV path
+    results_csv_path = os.path.join(project_root, "data", "alumni_results.csv")
+
+    # Function to extract year from date string (e.g., "7/1/15" -> 2015)
+    def extract_year(date_str):
+        """Extract year from date string and convert 2-digit year to 4-digit year."""
+        if pd.isna(date_str) or date_str == "":
+            return None
+        try:
+            # Parse the date string (format: M/D/YY or M/D/YYYY)
+            parts = str(date_str).split("/")
+            if len(parts) >= 3:
+                year = int(parts[2])
+                # Convert 2-digit year to 4-digit year
+                # Assuming years 00-50 are 2000-2050, and 51-99 are 1951-1999
+                if year < 100:
+                    if year <= 50:
+                        year = 2000 + year
+                    else:
+                        year = 1900 + year
+                return year
+        except (ValueError, IndexError) as e:
+            print(f"Error parsing date '{date_str}': {e}")
+            return None
+        return None
+
+    # Function to save results to CSV (called after each row is processed)
+    def save_results_to_csv(update_data):
+        """Save the current results to CSV file, overwriting previous results."""
+        if not update_data:
+            return
+        
+        results_df = pd.DataFrame(update_data)
+        
+        # Ensure token columns are at the end by reordering columns if needed
+        token_columns = ["Total tokens used", "Prompt tokens used", "Candidates tokens used", 
+                         "Cached content tokens used", "Thoughts tokens used"]
+        other_columns = [col for col in results_df.columns if col not in token_columns]
+        # Reorder: all other columns first, then token columns at the end
+        column_order = other_columns + [col for col in token_columns if col in results_df.columns]
+        results_df = results_df[column_order]
+        
+        results_df.to_csv(results_csv_path, index=False)
 
     # update_dict to store the results
     update_data = []        
@@ -36,7 +80,11 @@ async def main():
 
         try:
             alumni_name = row["First Name"] + " " + row["Last Name"]
-            year_of_entry = row["Entry Year"]
+            residency_start_date = row["Residency Start Date"]
+            year_of_entry = extract_year(residency_start_date)
+            
+            if year_of_entry is None:
+                raise ValueError(f"Could not extract year from residency start date: {residency_start_date}")
             
             # Construct query
             query = f"alumni name: {alumni_name}, year of entry: {year_of_entry}"
@@ -85,28 +133,35 @@ async def main():
             # Combine row data with token data (tokens at the end)
             row_data.update(token_data)
             update_data.append(row_data)
+            
+            # Save results after each successful row processing
+            save_results_to_csv(update_data)
+            print(f"✓ Processed and saved: {alumni_name} (Year: {year_of_entry})")
+            
         except Exception as e:
-            print(f"Error getting agent response for {alumni_name} with year of entry {year_of_entry} (index {index}): {e}")
+            # Handle case where alumni_name or year_of_entry might not be set
+            try:
+                error_alumni_name = row["First Name"] + " " + row["Last Name"]
+            except:
+                error_alumni_name = f"Row {index}"
+            try:
+                error_year = extract_year(row["Residency Start Date"])
+            except:
+                error_year = None
+            print(f"Error getting agent response for {error_alumni_name} with year of entry {error_year} (index {index}): {e}")
             update_data.append({
-                "Name": alumni_name,
-                "Year of Entry to Yale": year_of_entry,
+                "Name": error_alumni_name,
+                "Year of Entry to Yale": error_year if error_year else "",
                 "Error": str(e),
             })
+            
+            # Save results after each error case as well
+            save_results_to_csv(update_data)
+            print(f"✗ Error saved for: {error_alumni_name}")
             continue
 
-    # Save the results to a csv file
-    results_df = pd.DataFrame(update_data)
-    
-    # Ensure token columns are at the end by reordering columns if needed
-    token_columns = ["Total tokens used", "Prompt tokens used", "Candidates tokens used", 
-                     "Cached content tokens used", "Thoughts tokens used"]
-    other_columns = [col for col in results_df.columns if col not in token_columns]
-    # Reorder: all other columns first, then token columns at the end
-    column_order = other_columns + [col for col in token_columns if col in results_df.columns]
-    results_df = results_df[column_order]
-    
-    results_df.to_csv(os.path.join(project_root, "data", "alumni_results.csv"), index=False)
-    print(f"Results saved to {os.path.join(project_root, 'data', 'alumni_results.csv')}")
+    print(f"\nFinal results saved to {results_csv_path}")
+    print(f"Total rows processed: {len(update_data)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
