@@ -33,29 +33,6 @@ async def main():
     # Get the output CSV path
     results_csv_path = os.path.join(project_root, "data", "alumni_results.csv")
 
-    # Function to extract year from date string (e.g., "7/1/15" -> 2015)
-    def extract_year(date_str):
-        """Extract year from date string and convert 2-digit year to 4-digit year."""
-        if pd.isna(date_str) or date_str == "":
-            return None
-        try:
-            # Parse the date string (format: M/D/YY or M/D/YYYY)
-            parts = str(date_str).split("/")
-            if len(parts) >= 3:
-                year = int(parts[2])
-                # Convert 2-digit year to 4-digit year
-                # Assuming years 00-50 are 2000-2050, and 51-99 are 1951-1999
-                if year < 100:
-                    if year <= 50:
-                        year = 2000 + year
-                    else:
-                        year = 1900 + year
-                return year
-        except (ValueError, IndexError) as e:
-            print(f"Error parsing date '{date_str}': {e}")
-            return None
-        return None
-
     # Function to save results to CSV (called after each row is processed)
     def save_results_to_csv(update_data):
         """Save the current results to CSV file, overwriting previous results."""
@@ -80,11 +57,7 @@ async def main():
 
         try:
             alumni_name = row["First Name"] + " " + row["Last Name"]
-            residency_start_date = row["Residency Start Date"]
-            year_of_entry = extract_year(residency_start_date)
-            
-            if year_of_entry is None:
-                raise ValueError(f"Could not extract year from residency start date: {residency_start_date}")
+            year_of_entry = row["Year"]
             
             # Construct query
             query = f"alumni name: {alumni_name}, year of entry: {year_of_entry}"
@@ -145,7 +118,7 @@ async def main():
             except:
                 error_alumni_name = f"Row {index}"
             try:
-                error_year = extract_year(row["Residency Start Date"])
+                error_year = row["Year"]
             except:
                 error_year = None
             print(f"Error getting agent response for {error_alumni_name} with year of entry {error_year} (index {index}): {e}")
