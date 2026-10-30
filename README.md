@@ -1,3 +1,5 @@
+> **Archived 2026-10-30** (by WatchTower, Pouria's decision). Not in use. The results (`data/`, personal data, never committed here) are kept in a private repository.
+
 # Yale Alumni Assistant
 
 A multi-agent AI system built with Google's Agent Development Kit (ADK) that researches and compiles comprehensive professional information about Yale University medical alumni, specifically those from the Department of Radiology and Biomedical Imaging.
